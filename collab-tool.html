@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Doco — 가입 없는 협업툴</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard Variable',Pretendard,'Noto Sans KR',sans-serif;background:#f5f5f3;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+.wrap{display:flex;width:100%;max-width:960px;height:720px;border:1px solid #e0ddd5;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 4px 32px rgba(0,0,0,0.08)}
+
+/* sidebar */
+.sidebar{width:52px;border-right:1px solid #e0ddd5;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;background:#faf9f7;flex-shrink:0}
+.logo{font-size:20px;color:#534AB7;margin-bottom:8px;font-weight:700;line-height:1}
+.nav-btn{width:36px;height:36px;border-radius:10px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:background 0.15s}
+.nav-btn:hover{background:#f0eff8}
+.nav-btn.active{background:#EEEDFE}
+.nav-btn svg{width:18px;height:18px;stroke:#888;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.15s}
+.nav-btn.active svg{stroke:#534AB7}
+.badge{position:absolute;top:5px;right:5px;width:7px;height:7px;background:#E24B4A;border-radius:50%;border:1.5px solid #faf9f7}
+.nav-sep{width:24px;height:1px;background:#e0ddd5;margin:4px 0}
+
+/* main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #e0ddd5;flex-shrink:0;background:#fff}
+.page-title{font-size:14px;font-weight:600;color:#1a1a1a;flex:1}
+.url-pill{display:flex;align-items:center;gap:5px;background:#f5f5f3;border:1px solid #e0ddd5;border-radius:20px;padding:4px 10px;font-size:11px;color:#888;cursor:pointer;transition:border-color 0.15s}
+.url-pill:hover{border-color:#bbb}
+.green-dot{width:5px;height:5px;background:#1D9E75;border-radius:50%;flex-shrink:0}
+.btn-share{background:#534AB7;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s}
+.btn-share:hover{background:#7F77DD}
+.content{flex:1;overflow:hidden}
+.page{display:none;height:100%;overflow:hidden}
+.page.active{display:flex;flex-direction:column}
+
+/* ===== 채팅 ===== */
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.msg{display:flex;gap:10px;align-items:flex-end}
+.msg.me{flex-direction:row-reverse}
+.av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0}
+.av-p{background:#CECBF6;color:#3C3489}
+.av-t{background:#9FE1CB;color:#085041}
+.av-c{background:#F5C4B3;color:#712B13}
+.bubble-wrap{display:flex;flex-direction:column;gap:3px;max-width:68%}
+.msg.me .bubble-wrap{align-items:flex-end}
+.bubble{background:#f5f5f3;border-radius:12px 12px 12px 3px;padding:8px 12px;font-size:13px;line-height:1.6;color:#1a1a1a;word-break:break-all}
+.msg.me .bubble{background:#EEEDFE;color:#26215C;border-radius:12px 12px 3px 12px}
+.msg-meta{font-size:11px;color:#bbb}
+.chat-input-row{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid #e0ddd5;flex-shrink:0;background:#fff}
+.chat-input{flex:1;border:1px solid #e0ddd5;border-radius:20px;padding:8px 14px;font-size:13px;background:#faf9f7;color:#1a1a1a;outline:none;font-family:inherit;transition:border-color 0.15s}
+.chat-input:focus{border-color:#7F77DD;background:#fff}
+.send-btn{width:34px;height:34px;background:#534AB7;border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.15s}
+.send-btn:hover{background:#7F77DD}
+.send-btn svg{width:14px;height:14px;fill:#fff}
+
+/* ===== 칸반 ===== */
+.kanban{display:flex;gap:12px;padding:16px;overflow-x:auto;height:100%;align-items:flex-start}
+.k-col{flex:0 0 195px;background:#faf9f7;border-radius:12px;border:1px solid #e0ddd5;padding:12px;display:flex;flex-direction:column;gap:8px}
+.k-col-title{font-size:12px;font-weight:600;color:#888;display:flex;align-items:center;justify-content:space-between}
+.k-count{background:#fff;border:1px solid #e0ddd5;border-radius:10px;padding:1px 7px;font-size:11px;color:#aaa}
+.k-card{background:#fff;border:1px solid #e0ddd5;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color 0.15s}
+.k-card:hover{border-color:#bbb}
+.k-card-title{font-size:13px;color:#1a1a1a;margin-bottom:7px;line-height:1.4}
+.k-tag{display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:500}
+.tag-p{background:#EEEDFE;color:#3C3489}
+.tag-t{background:#E1F5EE;color:#085041}
+.tag-a{background:#FAEEDA;color:#633806}
+.k-due{font-size:11px;color:#aaa;margin-top:6px}
+.k-due.overdue{color:#A32D2D;font-weight:500}
+.k-add{width:100%;background:transparent;border:1px dashed #e0ddd5;border-radius:10px;padding:7px;font-size:12px;color:#bbb;cursor:pointer;font-family:inherit;transition:all 0.15s}
+.k-add:hover{background:#fff;color:#888;border-color:#bbb}
+
+/* ===== 일정 ===== */
+.sched-header{display:flex;align-items:center;gap:8px;padding:12px 16px 10px;border-bottom:1px solid #e0ddd5;flex-shrink:0}
+.sched-month{font-size:14px;font-weight:600;color:#1a1a1a;flex:1}
+.nav-arrow{background:transparent;border:1px solid #e0ddd5;border-radius:8px;padding:3px 9px;font-size:13px;cursor:pointer;color:#888;font-family:inherit;transition:all 0.15s}
+.nav-arrow:hover{border-color:#bbb;color:#444}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:0 16px 8px;flex-shrink:0}
+.cal-day-label{font-size:11px;color:#bbb;text-align:center;padding:4px 0}
+.cal-cell{min-height:52px;border:0.5px solid #f0efe8;padding:4px;font-size:11px;color:#888;background:#fff;cursor:pointer}
+.cal-cell:hover{background:#faf9f7}
+.cal-cell.today{background:#EEEDFE}
+.cal-cell.today .day-num{color:#534AB7;font-weight:600}
+.day-num{font-size:11px;margin-bottom:2px;color:#888}
+.cal-event{background:#CECBF6;color:#3C3489;border-radius:3px;padding:1px 4px;font-size:10px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-event.teal{background:#9FE1CB;color:#085041}
+.cal-event.coral{background:#F5C4B3;color:#712B13}
+.sched-list{flex:1;overflow-y:auto;padding:10px 16px}
+.sched-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0efe8}
+.sched-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sched-info{flex:1}
+.sched-title{font-size:13px;color:#1a1a1a;font-weight:500}
+.sched-meta{font-size:11px;color:#aaa;margin-top:2px}
+
+/* ===== 자료 ===== */
+.docs-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid #e0ddd5;flex-shrink:0}
+.search-input{flex:1;border:1px solid #e0ddd5;border-radius:8px;padding:6px 10px;font-size:13px;background:#faf9f7;color:#1a1a1a;outline:none;font-family:inherit;transition:border-color 0.15s}
+.search-input:focus{border-color:#7F77DD;background:#fff}
+.btn-upload{background:transparent;border:1px solid #e0ddd5;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;color:#888;font-family:inherit;font-weight:500;transition:all 0.15s;white-space:nowrap}
+.btn-upload:hover{border-color:#bbb;color:#444}
+.docs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:14px 16px;overflow-y:auto;flex:1;align-content:start}
+.doc-card{background:#fff;border:1px solid #e0ddd5;border-radius:12px;padding:14px;cursor:pointer;transition:border-color 0.15s}
+.doc-card:hover{border-color:#bbb}
+.doc-icon{width:36px;height:44px;border-radius:6px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:0.02em}
+.di-doc{background:#EEEDFE;color:#534AB7}
+.di-pdf{background:#FCEBEB;color:#A32D2D}
+.di-img{background:#FAEEDA;color:#854F0B}
+.di-xls{background:#EAF3DE;color:#3B6D11}
+.doc-name{font-size:13px;color:#1a1a1a;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.doc-meta{font-size:11px;color:#aaa}
+
+/* ===== 알림 ===== */
+.notif-section-label{padding:8px 16px 4px;font-size:11px;font-weight:600;color:#bbb;letter-spacing:0.04em}
+.notif-list{flex:1;overflow-y:auto}
+.notif-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid #f0efe8;cursor:pointer;transition:background 0.12s}
+.notif-item:hover{background:#faf9f7}
+.notif-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ni-p{background:#EEEDFE} .ni-t{background:#E1F5EE} .ni-a{background:#FAEEDA} .ni-r{background:#FCEBEB}
+.notif-icon svg{width:15px;height:15px;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.ni-p svg{stroke:#534AB7} .ni-t svg{stroke:#0F6E56} .ni-a svg{stroke:#854F0B} .ni-r svg{stroke:#A32D2D}
+.notif-body{flex:1}
+.notif-title{font-size:13px;color:#1a1a1a;line-height:1.5}
+.notif-title b{font-weight:600}
+.notif-time{font-size:11px;color:#bbb;margin-top:2px}
+.unread-dot{width:6px;height:6px;background:#534AB7;border-radius:50%;margin-top:7px;flex-shrink:0}
+
+/* ===== 할 일 ===== */
+.todo-section-label{padding:10px 16px 4px;font-size:11px;font-weight:600;color:#bbb;letter-spacing:0.04em;flex-shrink:0}
+.todo-list{flex:1;overflow-y:auto;padding:0 16px}
+.todo-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0efe8}
+.todo-check{width:18px;height:18px;border-radius:5px;border:1.5px solid #ddd;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;background:#fff}
+.todo-check:hover{border-color:#7F77DD}
+.todo-check.done{background:#534AB7;border-color:#534AB7}
+.todo-check.done::after{content:'';display:block;width:9px;height:5px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+.todo-text{flex:1;font-size:13px;color:#1a1a1a;transition:color 0.15s}
+.todo-text.done{color:#bbb;text-decoration:line-through}
+.todo-due{font-size:11px;color:#aaa;white-space:nowrap}
+.todo-due.urgent{color:#A32D2D;font-weight:600}
+.todo-add-row{display:flex;gap:8px;padding:10px 16px;border-top:1px solid #e0ddd5;flex-shrink:0;background:#fff}
+.todo-add-input{flex:1;border:1px solid #e0ddd5;border-radius:8px;padding:7px 10px;font-size:13px;background:#faf9f7;color:#1a1a1a;outline:none;font-family:inherit;transition:border-color 0.15s}
+.todo-add-input:focus{border-color:#7F77DD;background:#fff}
+.btn-add{background:#534AB7;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.15s;white-space:nowrap}
+.btn-add:hover{background:#7F77DD}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="sidebar">
+  <div class="logo">⬡</div>
+  <button class="nav-btn active" onclick="switchPage('chat',this)" title="채팅">
+    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  </button>
+  <button class="nav-btn" onclick="switchPage('kanban',this)" title="칸반 보드">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg>
+  </button>
+  <button class="nav-btn" onclick="switchPage('schedule',this)" title="일정">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+  </button>
+  <button class="nav-btn" onclick="switchPage('docs',this)" title="자료">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+  </button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" onclick="switchPage('notif',this)" title="알림">
+    <div class="badge"></div>
+    <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  </button>
+  <button class="nav-btn" onclick="switchPage('todo',this)" title="할 일">
+    <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+  </button>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <span class="page-title" id="pageTitle">채팅</span>
+    <div class="url-pill">
+      <div class="green-dot"></div>
+      <span>doco.app/r/xk9p2m</span>
+    </div>
+    <button class="btn-share">링크 공유</button>
+  </div>
+  <div class="content">
+
+    <!-- 채팅 -->
+    <div class="page active" id="page-chat">
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg">
+          <div class="av av-t">JK</div>
+          <div class="bubble-wrap">
+            <div class="bubble">안녕하세요! Q2 기획 문서 공유드렸어요. 확인해 주세요.</div>
+            <div class="msg-meta">김정현 · 오전 10:02</div>
+          </div>
+        </div>
+        <div class="msg">
+          <div class="av av-c">SY</div>
+          <div class="bubble-wrap">
+            <div class="bubble">네, 봤어요. 3번 항목 일정이 너무 빡빡한 것 같아서요 — 조율 가능할까요?</div>
+            <div class="msg-meta">이수연 · 오전 10:05</div>
+          </div>
+        </div>
+        <div class="msg me">
+          <div class="av av-p">나</div>
+          <div class="bubble-wrap">
+            <div class="bubble">맞아요. 칸반에서 마감일 수정해 둘게요!</div>
+            <div class="msg-meta">오전 10:07</div>
+          </div>
+        </div>
+        <div class="msg">
+          <div class="av av-t">JK</div>
+          <div class="bubble-wrap">
+            <div class="bubble">감사합니다. 오늘 오후에 디자인 파일도 올려드릴게요.</div>
+            <div class="msg-meta">김정현 · 오전 10:09</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatInput" placeholder="메시지를 입력하세요..." autocomplete="off" lang="ko"/>
+        <button class="send-btn" id="sendBtn">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 칸반 -->
+    <div class="page" id="page-kanban">
+      <div class="kanban">
+        <div class="k-col">
+          <div class="k-col-title">할 일 <span class="k-count">3</span></div>
+          <div class="k-card">
+            <div class="k-card-title">경쟁사 UI 벤치마킹</div>
+            <span class="k-tag tag-p">기획</span>
+            <div class="k-due">~ 4/18</div>
+          </div>
+          <div class="k-card">
+            <div class="k-card-title">사용자 인터뷰 설계</div>
+            <span class="k-tag tag-t">리서치</span>
+            <div class="k-due">~ 4/20</div>
+          </div>
+          <div class="k-card">
+            <div class="k-card-title">랜딩 페이지 카피 작성</div>
+            <span class="k-tag tag-a">마케팅</span>
+            <div class="k-due overdue">~ 4/12 마감 초과</div>
+          </div>
+          <button class="k-add">+ 카드 추가</button>
+        </div>
+        <div class="k-col">
+          <div class="k-col-title">진행 중 <span class="k-count">2</span></div>
+          <div class="k-card">
+            <div class="k-card-title">프로토타입 1차 개발</div>
+            <span class="k-tag tag-p">개발</span>
+            <div class="k-due">~ 4/22</div>
+          </div>
+          <div class="k-card">
+            <div class="k-card-title">기획서 v2 작성</div>
+            <span class="k-tag tag-t">기획</span>
+            <div class="k-due">~ 4/19</div>
+          </div>
+          <button class="k-add">+ 카드 추가</button>
+        </div>
+        <div class="k-col">
+          <div class="k-col-title">검토 중 <span class="k-count">1</span></div>
+          <div class="k-card">
+            <div class="k-card-title">디자인 시스템 정의</div>
+            <span class="k-tag tag-a">디자인</span>
+            <div class="k-due">~ 4/16</div>
+          </div>
+          <button class="k-add">+ 카드 추가</button>
+        </div>
+        <div class="k-col">
+          <div class="k-col-title">완료 <span class="k-count">2</span></div>
+          <div class="k-card" style="opacity:0.55">
+            <div class="k-card-title">프로젝트 킥오프 미팅</div>
+            <span class="k-tag tag-t">기획</span>
+          </div>
+          <div class="k-card" style="opacity:0.55">
+            <div class="k-card-title">팀 온보딩 문서 공유</div>
+            <span class="k-tag tag-p">기획</span>
+          </div>
+          <button class="k-add">+ 카드 추가</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 일정 -->
+    <div class="page" id="page-schedule">
+      <div class="sched-header">
+        <button class="nav-arrow">‹</button>
+        <span class="sched-month">2025년 4월</span>
+        <button class="nav-arrow">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-day-label">일</div><div class="cal-day-label">월</div><div class="cal-day-label">화</div>
+        <div class="cal-day-label">수</div><div class="cal-day-label">목</div><div class="cal-day-label">금</div><div class="cal-day-label">토</div>
+        <div class="cal-cell"><div class="day-num" style="color:#ddd">30</div></div>
+        <div class="cal-cell"><div class="day-num" style="color:#ddd">31</div></div>
+        <div class="cal-cell"><div class="day-num">1</div></div>
+        <div class="cal-cell"><div class="day-num">2</div></div>
+        <div class="cal-cell"><div class="day-num">3</div></div>
+        <div class="cal-cell"><div class="day-num">4</div></div>
+        <div class="cal-cell"><div class="day-num">5</div></div>
+        <div class="cal-cell"><div class="day-num">6</div></div>
+        <div class="cal-cell"><div class="day-num">7</div><div class="cal-event">킥오프 미팅</div></div>
+        <div class="cal-cell"><div class="day-num">8</div></div>
+        <div class="cal-cell"><div class="day-num">9</div></div>
+        <div class="cal-cell"><div class="day-num">10</div><div class="cal-event teal">기획서 v1</div></div>
+        <div class="cal-cell"><div class="day-num">11</div></div>
+        <div class="cal-cell"><div class="day-num">12</div></div>
+        <div class="cal-cell"><div class="day-num">13</div></div>
+        <div class="cal-cell today"><div class="day-num">14</div><div class="cal-event">팀 위클리</div></div>
+        <div class="cal-cell"><div class="day-num">15</div></div>
+        <div class="cal-cell"><div class="day-num">16</div><div class="cal-event coral">디자인 검토</div></div>
+        <div class="cal-cell"><div class="day-num">17</div></div>
+        <div class="cal-cell"><div class="day-num">18</div></div>
+        <div class="cal-cell"><div class="day-num">19</div></div>
+        <div class="cal-cell"><div class="day-num">20</div></div>
+        <div class="cal-cell"><div class="day-num">21</div></div>
+        <div class="cal-cell"><div class="day-num">22</div><div class="cal-event">프로토타입 데모</div></div>
+        <div class="cal-cell"><div class="day-num">23</div></div>
+        <div class="cal-cell"><div class="day-num">24</div></div>
+        <div class="cal-cell"><div class="day-num">25</div></div>
+        <div class="cal-cell"><div class="day-num">26</div></div>
+        <div class="cal-cell"><div class="day-num">27</div></div>
+        <div class="cal-cell"><div class="day-num">28</div></div>
+        <div class="cal-cell"><div class="day-num">29</div><div class="cal-event teal">스프린트 회고</div></div>
+        <div class="cal-cell"><div class="day-num">30</div></div>
+      </div>
+      <div class="sched-list">
+        <div class="sched-item">
+          <div class="sched-dot" style="background:#534AB7"></div>
+          <div class="sched-info"><div class="sched-title">팀 위클리</div><div class="sched-meta">오늘 · 오후 3:00</div></div>
+        </div>
+        <div class="sched-item">
+          <div class="sched-dot" style="background:#D85A30"></div>
+          <div class="sched-info"><div class="sched-title">디자인 시스템 검토</div><div class="sched-meta">4월 16일 · 오전 11:00</div></div>
+        </div>
+        <div class="sched-item">
+          <div class="sched-dot" style="background:#534AB7"></div>
+          <div class="sched-info"><div class="sched-title">프로토타입 데모</div><div class="sched-meta">4월 22일 · 오후 2:00</div></div>
+        </div>
+        <div class="sched-item">
+          <div class="sched-dot" style="background:#1D9E75"></div>
+          <div class="sched-info"><div class="sched-title">스프린트 회고</div><div class="sched-meta">4월 29일 · 오후 5:00</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 자료 -->
+    <div class="page" id="page-docs">
+      <div class="docs-toolbar">
+        <input class="search-input" placeholder="파일 검색..." autocomplete="off" lang="ko"/>
+        <button class="btn-upload">+ 업로드</button>
+      </div>
+      <div class="docs-grid">
+        <div class="doc-card"><div class="doc-icon di-doc">DOC</div><div class="doc-name">Q2 기획서 v2</div><div class="doc-meta">방금 수정됨</div></div>
+        <div class="doc-card"><div class="doc-icon di-doc">DOC</div><div class="doc-name">온보딩 가이드</div><div class="doc-meta">3일 전 수정됨</div></div>
+        <div class="doc-card"><div class="doc-icon di-pdf">PDF</div><div class="doc-name">경쟁사 분석 보고서</div><div class="doc-meta">이수연 · 1주 전</div></div>
+        <div class="doc-card"><div class="doc-icon di-img">IMG</div><div class="doc-name">디자인 시스템 v1</div><div class="doc-meta">김정현 · 2일 전</div></div>
+        <div class="doc-card"><div class="doc-icon di-xls">XLS</div><div class="doc-name">예산 계획서</div><div class="doc-meta">나 · 4일 전</div></div>
+        <div class="doc-card"><div class="doc-icon di-doc">DOC</div><div class="doc-name">회의록 4/7</div><div class="doc-meta">김정현 · 7일 전</div></div>
+      </div>
+    </div>
+
+    <!-- 알림 -->
+    <div class="page" id="page-notif">
+      <div class="notif-section-label">오늘</div>
+      <div class="notif-list">
+        <div class="notif-item">
+          <div class="notif-icon ni-r"><svg viewBox="0 0 24 24" style="stroke:#A32D2D"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+          <div class="notif-body"><div class="notif-title"><b>랜딩 페이지 카피</b> 마감이 지났어요</div><div class="notif-time">30분 전</div></div>
+          <div class="unread-dot"></div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-icon ni-p"><svg viewBox="0 0 24 24" style="stroke:#534AB7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <div class="notif-body"><div class="notif-title"><b>이수연</b>이 채팅에 메시지를 남겼어요</div><div class="notif-time">1시간 전</div></div>
+          <div class="unread-dot"></div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-icon ni-a"><svg viewBox="0 0 24 24" style="stroke:#854F0B"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+          <div class="notif-body"><div class="notif-title">오늘 오후 3시 <b>팀 위클리</b> 일정이 있어요</div><div class="notif-time">2시간 전</div></div>
+          <div class="unread-dot"></div>
+        </div>
+        <div class="notif-section-label" style="padding-top:10px">어제</div>
+        <div class="notif-item">
+          <div class="notif-icon ni-t"><svg viewBox="0 0 24 24" style="stroke:#0F6E56"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <div class="notif-body"><div class="notif-title"><b>김정현</b>이 디자인 시스템 v1 파일을 업로드했어요</div><div class="notif-time">어제 오후 4:12</div></div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-icon ni-p"><svg viewBox="0 0 24 24" style="stroke:#534AB7"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg></div>
+          <div class="notif-body"><div class="notif-title"><b>프로토타입 1차 개발</b> 카드가 진행 중으로 이동됐어요</div><div class="notif-time">어제 오전 11:30</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 할 일 -->
+    <div class="page" id="page-todo">
+      <div class="todo-section-label">오늘 할 일</div>
+      <div class="todo-list" id="todoList">
+        <div class="todo-item">
+          <div class="todo-check" onclick="toggleTodo(this)"></div>
+          <span class="todo-text">랜딩 페이지 카피 초안 완성</span>
+          <span class="todo-due urgent">오늘 마감</span>
+        </div>
+        <div class="todo-item">
+          <div class="todo-check" onclick="toggleTodo(this)"></div>
+          <span class="todo-text">팀 위클리 준비 — 주간 요약 작성</span>
+          <span class="todo-due urgent">오늘 오후 2시</span>
+        </div>
+        <div class="todo-item">
+          <div class="todo-check done" onclick="toggleTodo(this)"></div>
+          <span class="todo-text done">기획서 v2 공유</span>
+          <span class="todo-due">완료</span>
+        </div>
+        <div class="todo-section-label" style="padding-left:0;padding-top:14px">이번 주</div>
+        <div class="todo-item">
+          <div class="todo-check" onclick="toggleTodo(this)"></div>
+          <span class="todo-text">경쟁사 UI 벤치마킹 리포트</span>
+          <span class="todo-due">4/18</span>
+        </div>
+        <div class="todo-item">
+          <div class="todo-check" onclick="toggleTodo(this)"></div>
+          <span class="todo-text">사용자 인터뷰 설계서 작성</span>
+          <span class="todo-due">4/20</span>
+        </div>
+        <div class="todo-item">
+          <div class="todo-check" onclick="toggleTodo(this)"></div>
+          <span class="todo-text">디자인 시스템 검토 참석</span>
+          <span class="todo-due">4/16</span>
+        </div>
+      </div>
+      <div class="todo-add-row">
+        <input class="todo-add-input" id="todoInput" placeholder="할 일을 입력하세요..." autocomplete="off" lang="ko"/>
+        <button class="btn-add" id="todoAddBtn">추가</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+var titles={chat:'채팅',kanban:'프로젝트 — 칸반 보드',schedule:'프로젝트 — 일정',docs:'자료',notif:'알림',todo:'할 일'};
+
+function switchPage(id,el){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active')});
+  document.getElementById('page-'+id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('pageTitle').textContent=titles[id]||id;
+}
+
+/* ---- 한글 IME 대응 채팅 ---- */
+var chatComposing=false;
+var chatInput=document.getElementById('chatInput');
+var sendBtn=document.getElementById('sendBtn');
+
+chatInput.addEventListener('compositionstart',function(){chatComposing=true});
+chatInput.addEventListener('compositionend',function(){chatComposing=false});
+chatInput.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!chatComposing){
+    e.preventDefault();
+    doSendChat();
+  }
+});
+sendBtn.addEventListener('click',function(){doSendChat()});
+
+function doSendChat(){
+  var txt=chatInput.value.trim();
+  if(!txt)return;
+  var list=document.getElementById('chatMessages');
+  var now=new Date();
+  var hh=now.getHours(),mm=now.getMinutes();
+  var ampm=hh<12?'오전':'오후';
+  var h=hh%12||12;
+  var time=ampm+' '+h+':'+(mm<10?'0':'')+mm;
+  var d=document.createElement('div');
+  d.className='msg me';
+  d.innerHTML='<div class="av av-p">나</div><div class="bubble-wrap"><div class="bubble">'+escHtml(txt)+'</div><div class="msg-meta">'+time+'</div></div>';
+  list.appendChild(d);
+  chatInput.value='';
+  list.scrollTop=list.scrollHeight;
+}
+
+/* ---- 한글 IME 대응 할 일 ---- */
+var todoComposing=false;
+var todoInput=document.getElementById('todoInput');
+var todoAddBtn=document.getElementById('todoAddBtn');
+
+todoInput.addEventListener('compositionstart',function(){todoComposing=true});
+todoInput.addEventListener('compositionend',function(){todoComposing=false});
+todoInput.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!todoComposing){
+    e.preventDefault();
+    doAddTodo();
+  }
+});
+todoAddBtn.addEventListener('click',function(){doAddTodo()});
+
+function doAddTodo(){
+  var txt=todoInput.value.trim();
+  if(!txt)return;
+  var list=document.getElementById('todoList');
+  var d=document.createElement('div');
+  d.className='todo-item';
+  d.innerHTML='<div class="todo-check" onclick="toggleTodo(this)"></div><span class="todo-text">'+escHtml(txt)+'</span><span class="todo-due">미정</span>';
+  list.appendChild(d);
+  todoInput.value='';
+  list.scrollTop=list.scrollHeight;
+}
+
+function toggleTodo(el){
+  el.classList.toggle('done');
+  var t=el.nextElementSibling;
+  t.classList.toggle('done');
+  var due=t.nextElementSibling;
+  if(el.classList.contains('done')&&due.textContent!=='완료'){due.dataset.prev=due.textContent;due.textContent='완료';due.classList.remove('urgent')}
+  else if(!el.classList.contains('done')&&due.dataset.prev){due.textContent=due.dataset.prev}
+}
+
+function escHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
