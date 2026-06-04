@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
 import { getSessionId, getSavedName, saveName } from '@/lib/session'
+import { ScheduleView } from './features/schedule/components/ScheduleView'
 
 type Message = {
   id: string
@@ -1506,31 +1507,7 @@ export default function RoomPage() {
 
               {activePage === 'schedule' && (
                 <div className="page active">
-                  <div className="sched-header">
-                    <button className="nav-arrow">‹</button>
-                    <span className="sched-month">2026년 4월</span>
-                    <button className="nav-arrow">›</button>
-                  </div>
-                  <div className="cal-grid">
-                    {['일', '월', '화', '수', '목', '금', '토'].map((d) => <div key={d} className="cal-day-label">{d}</div>)}
-                    {[30, 31, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30].map((day, index) => (
-                      <div key={index} className={`cal-cell ${day === 14 ? 'today' : ''}`}>
-                        <div className={`day-num ${index < 2 ? 'muted-day' : ''}`}>{day}</div>
-                        {day === 7 && <div className="cal-event">킥오프 미팅</div>}
-                        {day === 10 && <div className="cal-event teal">기획서 v1</div>}
-                        {day === 14 && <div className="cal-event">팀 위클리</div>}
-                        {day === 16 && <div className="cal-event coral">디자인 검토</div>}
-                        {day === 22 && <div className="cal-event">프로토타입 데모</div>}
-                        {day === 29 && <div className="cal-event teal">스프린트 회고</div>}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="sched-list">
-                    <div className="sched-item"><div className="sched-dot purple"></div><div className="sched-info"><div className="sched-title">팀 위클리</div><div className="sched-meta">오늘 · 오후 3:00</div></div></div>
-                    <div className="sched-item"><div className="sched-dot coral"></div><div className="sched-info"><div className="sched-title">디자인 시스템 검토</div><div className="sched-meta">4월 16일 · 오전 11:00</div></div></div>
-                    <div className="sched-item"><div className="sched-dot purple"></div><div className="sched-info"><div className="sched-title">프로토타입 데모</div><div className="sched-meta">4월 22일 · 오후 2:00</div></div></div>
-                    <div className="sched-item"><div className="sched-dot teal"></div><div className="sched-info"><div className="sched-title">스프린트 회고</div><div className="sched-meta">4월 29일 · 오후 5:00</div></div></div>
-                  </div>
+                  <ScheduleView roomId={roomId} sessionId={sessionId} />
                 </div>
               )}
 
