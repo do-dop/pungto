@@ -1,26 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import type { Schedule, ScheduleInput } from "../types";
+import type { Schedule, ScheduleColor, ScheduleInput } from "../types";
 
 type ScheduleFormModalProps = {
   initialSchedule?: Schedule | null;
+  initialDate?: string;
   onClose: () => void;
   onSubmit: (input: ScheduleInput) => Promise<boolean>;
+  onDelete?: (schedule: Schedule) => Promise<boolean>;
 };
+
+const scheduleColors: Array<{ value: ScheduleColor; label: string }> = [
+  { value: "purple", label: "보라" },
+  { value: "teal", label: "민트" },
+  { value: "coral", label: "코랄" },
+];
 
 export function ScheduleFormModal({
   initialSchedule,
+  initialDate,
   onClose,
   onSubmit,
+  onDelete,
 }: ScheduleFormModalProps) {
   const [title, setTitle] = useState(initialSchedule?.title ?? "");
-  const [scheduledDate, setScheduledDate] = useState(initialSchedule?.scheduled_date ?? "");
+  const [scheduledDate, setScheduledDate] = useState(initialSchedule?.scheduled_date ?? initialDate ?? "");
   const [description, setDescription] = useState(initialSchedule?.description ?? "");
+  const [color, setColor] = useState<ScheduleColor>(initialSchedule?.color ?? "purple");
   const [localError, setLocalError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = Boolean(initialSchedule);
+
+  const handleDelete = async () => {
+    if (!initialSchedule || !onDelete) return;
+
+    setIsSubmitting(true);
+    setLocalError(null);
+
+    const success = await onDelete(initialSchedule);
+
+    setIsSubmitting(false);
+
+    if (success) {
+      onClose();
+    }
+  };
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -40,6 +66,7 @@ export function ScheduleFormModal({
       title,
       scheduled_date: scheduledDate,
       description,
+      color,
     });
 
     setIsSubmitting(false);
@@ -87,13 +114,37 @@ export function ScheduleFormModal({
           />
         </label>
 
+        <fieldset className="schedule-field schedule-color-field">
+          <legend>색상</legend>
+          <div className="schedule-color-options">
+            {scheduleColors.map((option) => (
+              <label key={option.value} className={`schedule-color-option ${option.value} ${color === option.value ? "selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="schedule-color"
+                  value={option.value}
+                  checked={color === option.value}
+                  onChange={() => setColor(option.value)}
+                />
+                <span className="schedule-color-swatch" aria-hidden="true" />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         {localError && <p className="schedule-error">{localError}</p>}
 
         <div className="schedule-modal-actions">
-          <button type="button" onClick={onClose} disabled={isSubmitting}>
+          {isEditing && onDelete ? (
+            <button type="button" className="schedule-modal-delete" onClick={handleDelete} disabled={isSubmitting}>
+              삭제
+            </button>
+          ) : null}
+          <button type="button" className="schedule-modal-cancel" onClick={onClose} disabled={isSubmitting}>
             취소
           </button>
-          <button type="button" onClick={handleSubmit} disabled={isSubmitting}>
+          <button type="button" className="schedule-modal-save" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "저장 중..." : "저장"}
           </button>
         </div>

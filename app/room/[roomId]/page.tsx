@@ -260,6 +260,24 @@ function mapTeamRoleRow(row: TeamRoleRow): TeamRole {
   }
 }
 
+function formatSupabaseError(error: unknown) {
+  if (!error || typeof error !== 'object') return error
+
+  const candidate = error as {
+    code?: string
+    message?: string
+    details?: string
+    hint?: string
+  }
+
+  return {
+    code: candidate.code,
+    message: candidate.message,
+    details: candidate.details,
+    hint: candidate.hint,
+  }
+}
+
 const docsData = [
   { ext: 'DOC', className: 'di-doc', name: 'Q2 기획서 v2', meta: '방금 수정됨' },
   { ext: 'DOC', className: 'di-doc', name: '온보딩 가이드', meta: '3일 전 수정됨' },
@@ -595,23 +613,37 @@ export default function RoomPage() {
       ])
 
       if (metaError || linksError || rolesError) {
-        console.error('Load dashboard error:', { metaError, linksError, rolesError })
+        console.error('Load dashboard error:', {
+          metaError: formatSupabaseError(metaError),
+          linksError: formatSupabaseError(linksError),
+          rolesError: formatSupabaseError(rolesError),
+        })
         if (!cancelled) setDashboardNotice('대시보드를 불러오지 못했어요')
         return
       }
 
       if (!meta) {
-        const { error: seedMetaError } = await supabase.from('room_dashboard').insert({
-          room_id: roomId,
-          project_name: initialProjectName,
-          summary: initialProjectSummary,
-          goal: initialProjectGoal,
-        })
+        const { data: seededMeta, error: seedMetaError } = await supabase
+          .from('room_dashboard')
+          .upsert({
+            room_id: roomId,
+            project_name: initialProjectName,
+            summary: initialProjectSummary,
+            goal: initialProjectGoal,
+          }, { onConflict: 'room_id' })
+          .select('*')
+          .single()
 
         if (seedMetaError) {
-          console.error('Seed room_dashboard error:', seedMetaError)
+          console.error('Seed room_dashboard error:', formatSupabaseError(seedMetaError))
           if (!cancelled) setDashboardNotice('대시보드 초기화에 실패했어요')
           return
+        }
+
+        if (!cancelled && seededMeta) {
+          setProjectName(seededMeta.project_name || initialProjectName)
+          setProjectSummary(seededMeta.summary)
+          setProjectGoal(seededMeta.goal)
         }
       } else if (!cancelled) {
         setProjectName(meta.project_name || initialProjectName)
@@ -629,7 +661,7 @@ export default function RoomPage() {
         }))
         const { data: insertedLinks, error: seedLinksError } = await supabase.from('dashboard_links').insert(seedLinks).select('*').order('position', { ascending: true })
         if (seedLinksError) {
-          console.error('Seed dashboard_links error:', seedLinksError)
+          console.error('Seed dashboard_links error:', formatSupabaseError(seedLinksError))
           setDashboardNotice('링크 초기화에 실패했어요')
           return
         }
@@ -647,7 +679,7 @@ export default function RoomPage() {
         }))
         const { data: insertedRoles, error: seedRolesError } = await supabase.from('team_roles').insert(seedRoles).select('*').order('position', { ascending: true })
         if (seedRolesError) {
-          console.error('Seed team_roles error:', seedRolesError)
+          console.error('Seed team_roles error:', formatSupabaseError(seedRolesError))
           setDashboardNotice('팀원 역할 초기화에 실패했어요')
           return
         }

@@ -62,6 +62,7 @@ Supabase에 `schedules` 테이블을 추가한다고 가정한다.
 | `title` | text | 일정 제목 |
 | `description` | text | 일정 설명 |
 | `scheduled_date` | date | 일정 날짜 |
+| `color` | text | 일정 표시 색상: `purple`, `teal`, `coral` |
 | `created_by` | text | 생성자 session ID |
 | `created_at` | timestamp | 생성 시각 |
 | `updated_at` | timestamp | 수정 시각 |
@@ -77,13 +78,45 @@ create table if not exists schedules (
   title text not null,
   description text,
   scheduled_date date not null,
+  color text not null default 'purple',
   created_by text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint schedules_color_check
+    check (color in ('purple', 'teal', 'coral'))
 );
 
 create index if not exists idx_schedules_room_id
 on schedules(room_id);
+
+alter table schedules replica identity full;
+
+alter table schedules enable row level security;
+
+-- 익명 방 기반 협업 앱이므로 현재 구현에서는 public CRUD 정책을 사용한다.
+-- 실제 서비스에서는 방 참여자 검증 정책으로 강화해야 한다.
+create policy "Allow public schedule read"
+on schedules
+for select
+using (true);
+
+create policy "Allow public schedule insert"
+on schedules
+for insert
+with check (true);
+
+create policy "Allow public schedule update"
+on schedules
+for update
+using (true)
+with check (true);
+
+create policy "Allow public schedule delete"
+on schedules
+for delete
+using (true);
+
+alter publication supabase_realtime add table schedules;
 ```
 
 ---
@@ -131,11 +164,15 @@ on schedules(room_id);
 
 - 구독 대상 테이블: `schedules`
 - 구독 이벤트: `insert`, `update`, `delete`
-- 필터 기준: `room_id = 현재 roomId`
+- 필터 기준:
+  - insert/update: `room_id = 현재 roomId`
+  - delete: Supabase DELETE 이벤트의 old row 특성을 고려하여 id 기준으로 현재 목록에서 제거
 - 반영 방식:
   - insert: 새 일정을 목록에 추가
   - update: 기존 일정 항목을 수정
-  - delete: 삭제된 일정을 목록에서 제거
+  - delete: 삭제된 일정을 목록에서 제거하고, 클라이언트 broadcast로 다른 브라우저 반영을 보강
+
+DELETE 이벤트는 Supabase/Postgres 설정에 따라 필터링과 old row 전달 방식이 insert/update보다 제한될 수 있다. 따라서 `schedules` 테이블은 `replica identity full`로 설정하고, 삭제를 수행한 클라이언트가 같은 방 채널에 `schedule_deleted` broadcast를 보내 다른 브라우저가 id 기준으로 즉시 제거하도록 보강한다.
 
 구독은 컴포넌트가 언마운트될 때 해제하여 불필요한 중복 구독을 방지한다.
 

@@ -21,16 +21,21 @@ Pungto는 Next.js App Router, TypeScript, React, Supabase를 사용하는 실시
 - 일정 삭제
 - 제목과 날짜가 비어 있으면 저장하지 않음
 - 일정 데이터는 Supabase schedules 테이블에 저장
+- Supabase Realtime으로 같은 방의 일정 변경을 반영
+- 생성, 수정, 삭제 성공 시 현재 사용자 화면은 로컬 상태로 즉시 반영
+- 다른 브라우저의 삭제 반영을 위해 DELETE 이벤트와 클라이언트 broadcast를 함께 사용
+- 기존 일정 수정 모달에서 삭제 버튼 제공
+- 기존 일정 화면 디자인은 유지하고 목업 데이터만 실제 데이터로 교체
+- 일정 생성/수정 시 기존 디자인 톤에 맞는 색상 선택 지원
 - 일정 UI와 Supabase 로직은 기존 page.tsx에 직접 누적하지 않고 컴포넌트와 hook으로 분리
 
 설계 기준:
-- ScheduleView.tsx: 일정 목록과 전체 UI
+- ScheduleView.tsx: 기존 일정 탭 디자인 구조를 유지한 일정 달력과 목록 UI
 - ScheduleFormModal.tsx: 일정 생성/수정 입력 폼
-- ScheduleItem.tsx: 개별 일정 표시
-- useSchedules.ts: 일정 조회, 생성, 수정, 삭제 Supabase 로직
+- useSchedules.ts: 일정 조회, 생성, 수정, 삭제, Realtime 구독 Supabase 로직
 - types.ts: 일정 관련 타입 정의
 
-이번 PR에서는 Realtime은 구현하지 않고 CRUD까지만 구현한다.
+이번 구현에서는 CRUD와 Realtime 구독을 포함하되, 사용자가 처음 보던 일정 탭의 시각 디자인을 유지한다.
 
 ## 4. AI 생성 코드 검토 기준
 
@@ -40,6 +45,9 @@ Pungto는 Next.js App Router, TypeScript, React, Supabase를 사용하는 실시
 - 일정 생성, 수정, 삭제 실패 시 오류 메시지를 표시하는가?
 - Supabase 데이터 로직이 hook에 모여 있는가?
 - UI 컴포넌트와 데이터 처리 로직의 책임이 분리되어 있는가?
+- 현재 사용자의 생성, 수정, 삭제 결과가 새로고침 없이 즉시 반영되는가?
+- 기존 일정 화면의 달력, 월 이동, 일정 목록 디자인이 유지되는가?
+- 선택한 일정 색상이 저장되고 달력/목록에 동일하게 표시되는가?
 
 ## 5. 프로세스 적용의 교훈
 
