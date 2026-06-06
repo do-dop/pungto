@@ -33,6 +33,11 @@ alter table schedules replica identity full;
 
 alter table schedules enable row level security;
 
+drop policy if exists "Allow public schedule read" on schedules;
+drop policy if exists "Allow public schedule insert" on schedules;
+drop policy if exists "Allow public schedule update" on schedules;
+drop policy if exists "Allow public schedule delete" on schedules;
+
 do $$
 begin
   if not exists (
@@ -40,12 +45,19 @@ begin
     from pg_policies
     where schemaname = 'public'
       and tablename = 'schedules'
-      and policyname = 'Allow public schedule read'
+      and policyname = 'Allow room members to read schedules'
   ) then
-    create policy "Allow public schedule read"
+    create policy "Allow room members to read schedules"
     on schedules
     for select
-    using (true);
+    using (
+      exists (
+        select 1
+        from room_members
+        where room_members.room_id = schedules.room_id
+          and room_members.user_id = auth.uid()
+      )
+    );
   end if;
 end $$;
 
@@ -56,12 +68,19 @@ begin
     from pg_policies
     where schemaname = 'public'
       and tablename = 'schedules'
-      and policyname = 'Allow public schedule insert'
+      and policyname = 'Allow room members to create schedules'
   ) then
-    create policy "Allow public schedule insert"
+    create policy "Allow room members to create schedules"
     on schedules
     for insert
-    with check (true);
+    with check (
+      exists (
+        select 1
+        from room_members
+        where room_members.room_id = schedules.room_id
+          and room_members.user_id = auth.uid()
+      )
+    );
   end if;
 end $$;
 
@@ -72,13 +91,27 @@ begin
     from pg_policies
     where schemaname = 'public'
       and tablename = 'schedules'
-      and policyname = 'Allow public schedule update'
+      and policyname = 'Allow room members to update schedules'
   ) then
-    create policy "Allow public schedule update"
+    create policy "Allow room members to update schedules"
     on schedules
     for update
-    using (true)
-    with check (true);
+    using (
+      exists (
+        select 1
+        from room_members
+        where room_members.room_id = schedules.room_id
+          and room_members.user_id = auth.uid()
+      )
+    )
+    with check (
+      exists (
+        select 1
+        from room_members
+        where room_members.room_id = schedules.room_id
+          and room_members.user_id = auth.uid()
+      )
+    );
   end if;
 end $$;
 
@@ -89,12 +122,19 @@ begin
     from pg_policies
     where schemaname = 'public'
       and tablename = 'schedules'
-      and policyname = 'Allow public schedule delete'
+      and policyname = 'Allow room members to delete schedules'
   ) then
-    create policy "Allow public schedule delete"
+    create policy "Allow room members to delete schedules"
     on schedules
     for delete
-    using (true);
+    using (
+      exists (
+        select 1
+        from room_members
+        where room_members.room_id = schedules.room_id
+          and room_members.user_id = auth.uid()
+      )
+    );
   end if;
 end $$;
 

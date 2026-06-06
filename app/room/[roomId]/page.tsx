@@ -4,54 +4,52 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
+import { getRoomTitle, joinRoomWithPassword } from '@/lib/auth'
 import { getSessionId, getSavedName, saveName } from '@/lib/session'
+import { ChatView } from './features/chat/components/ChatView'
+import type { Message } from './features/chat/types'
+import { DashboardView } from './features/dashboard/components/DashboardView'
+import {
+  initialDashboardLinks,
+  initialProjectGoal,
+  initialProjectName,
+  initialProjectSummary,
+  initialTeamRoles,
+} from './features/dashboard/constants'
+import type {
+  DashboardLink,
+  DashboardLinkRow,
+  DashboardMetaRow,
+  TeamRole,
+  TeamRoleRow,
+} from './features/dashboard/types'
+import { mapDashboardLinkRow, mapTeamRoleRow } from './features/dashboard/utils'
 import { DocumentsView } from './features/documents/components/DocumentsView'
+import { KanbanView } from './features/kanban/components/KanbanView'
+import { initialKanbanTasks, kanbanColumns } from './features/kanban/constants'
+import type { KanbanColumnKey, KanbanTask, TaskRow } from './features/kanban/types'
+import { buildTaskInsert, buildTaskUpdate, mapTaskRow } from './features/kanban/utils'
 import { NotificationsView } from './features/notifications/components/NotificationsView'
 import { GlobalStyles } from './features/room/components/GlobalStyles'
 import { NavIcon } from './features/room/components/NavIcon'
 import { TodoView } from './features/todos/components/TodoView'
 import {
   docsData,
-  initialDashboardLinks,
-  initialKanbanTasks,
-  initialProjectGoal,
-  initialProjectName,
-  initialProjectSummary,
-  initialTeamRoles,
   initialTodos,
-  kanbanColumns,
   notifications,
   pageTitles,
   SHELL_BACKGROUND_STORAGE_KEY,
   shellBackgroundLabels,
 } from './features/room/constants'
 import type {
-  DashboardLink,
-  DashboardLinkRow,
-  DashboardMetaRow,
-  KanbanColumnKey,
-  KanbanTask,
-  Message,
   PageKey,
   ShellBackgroundKey,
-  TaskRow,
-  TeamRole,
-  TeamRoleRow,
   TodoItem,
 } from './features/room/types'
 import {
-  buildTaskInsert,
-  buildTaskUpdate,
-  formatDueLabel,
   formatSupabaseError,
-  formatTime,
-  getAvColor,
   getNextShellBackground,
   getShellBackgroundStyle,
-  mapDashboardLinkRow,
-  mapTaskRow,
-  mapTeamRoleRow,
-  toDateInputValue,
 } from './features/room/utils'
 import { ScheduleView } from './features/schedule/components/ScheduleView'
 
@@ -85,6 +83,10 @@ export default function RoomPage() {
   const [teamRoles, setTeamRoles] = useState<TeamRole[]>(initialTeamRoles)
   const [todos, setTodos] = useState<TodoItem[]>(initialTodos)
   const [todoInput, setTodoInput] = useState('')
+  const [roomTitle, setRoomTitle] = useState('Pungto')
+  const [authUserId, setAuthUserId] = useState<string | null>(null)
+  const [roomPassword, setRoomPassword] = useState('')
+  const [joinNotice, setJoinNotice] = useState('')
   const sessionId = getSessionId()
   const bottomRef = useRef<HTMLDivElement>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -94,6 +96,24 @@ export default function RoomPage() {
   const dashboardMetaSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const teamRoleSaveTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
   const url = typeof window !== 'undefined' ? window.location.href : ''
+
+  useEffect(() => {
+    if (!roomId) return
+
+    let cancelled = false
+
+    getRoomTitle(roomId)
+      .then((title) => {
+        if (!cancelled) setRoomTitle(title)
+      })
+      .catch((error) => {
+        console.error('Load room title error:', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [roomId])
 
   useEffect(() => {
     if (!joined || !roomId) return
@@ -419,6 +439,23 @@ export default function RoomPage() {
   async function join() {
     const trimmed = name.trim()
     if (!trimmed) return
+    const password = roomPassword.trim()
+    if (!password) {
+      setJoinNotice('방 비밀번호를 입력해주세요')
+      return
+    }
+
+    let userId = authUserId
+    try {
+      const user = await joinRoomWithPassword(roomId, password, trimmed)
+      userId = user.id
+      setAuthUserId(user.id)
+      setJoinNotice('')
+    } catch (error) {
+      console.error('Register room member error:', error)
+      setJoinNotice('비밀번호가 맞지 않거나 방에 입장할 수 없습니다')
+      return
+    }
 
     saveName(trimmed)
     const { error } = await supabase.from('members').upsert(
@@ -435,6 +472,7 @@ export default function RoomPage() {
       return
     }
 
+    setAuthUserId(userId)
     setJoined(true)
   }
 
@@ -795,7 +833,8 @@ export default function RoomPage() {
             <div className="join-badge">참여하기</div>
             <div className="logo join-logo">⬡</div>
             <h2 className="join-title">Pungto</h2>
-            <p className="join-desc">이름만 입력하면 바로 시작해요</p>
+            <div className="join-room-title">{roomTitle}</div>
+            <p className="join-desc">이름과 방 비밀번호를 입력하면 시작해요</p>
             <input
               className="join-input"
               placeholder="이름 또는 닉네임"
@@ -808,6 +847,23 @@ export default function RoomPage() {
               }}
               autoFocus
             />
+            <input
+              className="join-input"
+              type="password"
+              placeholder="방 비밀번호"
+              value={roomPassword}
+              onChange={(e) => {
+                setRoomPassword(e.target.value)
+                setJoinNotice('')
+              }}
+              onCompositionStart={() => { composingRef.current = true }}
+              onCompositionEnd={() => { composingRef.current = false }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !composingRef.current) join()
+              }}
+              autoComplete="current-password"
+            />
+            {joinNotice && <p className="join-error">{joinNotice}</p>}
             <button className="join-btn" onClick={join}>입장</button>
             <p className="join-hint">이전 이름은 이 기기에서 자동으로 기억돼요</p>
           </div>
@@ -848,7 +904,10 @@ export default function RoomPage() {
 
           <main className="main">
             <div className="topbar">
-              <span className="page-title">{pageTitles[activePage]}</span>
+              <div className="topbar-title">
+                <span className="room-title">{roomTitle}</span>
+                <span className="page-title">{pageTitles[activePage]}</span>
+              </div>
               <div className="url-pill" onClick={() => setShowQR((prev) => !prev)}>
                 <div className="green-dot" />
                 <span>{`pungto.app/r/${roomId}`}</span>
@@ -869,331 +928,75 @@ export default function RoomPage() {
 
             <div className="content">
               {activePage === 'dashboard' && (
-                <div className="page active dashboard-page">
-                  <div className="dashboard-grid">
-                    <section className="dash-card dash-hero">
-                      <div className="dash-card-head">
-                        <div>
-                          <p className="dash-eyebrow">Project Overview</p>
-                          {dashboardNotice ? <p className="dash-notice">{dashboardNotice}</p> : null}
-                        </div>
-                        <div className="dash-room-chip">Room {roomId}</div>
-                      </div>
-                      <label className="dash-field">
-                        <span>프로젝트명</span>
-                        <input
-                          className="dash-input dash-project-name"
-                          value={projectName}
-                          onChange={(e) => {
-                            const nextValue = e.target.value
-                            setProjectName(nextValue)
-                            scheduleDashboardMetaSave(nextValue, projectSummary, projectGoal)
-                          }}
-                        />
-                      </label>
-                      <label className="dash-field">
-                        <span>프로젝트 설명</span>
-                        <textarea
-                          className="dash-textarea"
-                          value={projectSummary}
-                          onChange={(e) => {
-                            const nextValue = e.target.value
-                            setProjectSummary(nextValue)
-                            scheduleDashboardMetaSave(projectName, nextValue, projectGoal)
-                          }}
-                        />
-                      </label>
-                      <label className="dash-field">
-                        <span>현재 목표</span>
-                        <textarea
-                          className="dash-textarea compact"
-                          value={projectGoal}
-                          onChange={(e) => {
-                            const nextValue = e.target.value
-                            setProjectGoal(nextValue)
-                            scheduleDashboardMetaSave(projectName, projectSummary, nextValue)
-                          }}
-                        />
-                      </label>
-                    </section>
-
-                    <section className="dash-card">
-                      <div className="dash-card-head">
-                        <div>
-                          <p className="dash-eyebrow">Quick Links</p>
-                          <h3 className="dash-title">참고 링크</h3>
-                        </div>
-                      </div>
-                      <div className="dash-link-form">
-                        <select className="dash-input" value={linkKindInput} onChange={(e) => setLinkKindInput(e.target.value as DashboardLink['kind'])}>
-                          <option value="github">GitHub</option>
-                          <option value="figma">Figma</option>
-                          <option value="notion">Notion</option>
-                          <option value="docs">Docs</option>
-                          <option value="etc">기타</option>
-                        </select>
-                        <input
-                          className="dash-input"
-                          placeholder="링크 이름"
-                          value={linkLabelInput}
-                          onChange={(e) => setLinkLabelInput(e.target.value)}
-                        />
-                        <input
-                          className="dash-input link-url"
-                          placeholder="https://..."
-                          value={linkUrlInput}
-                          onChange={(e) => setLinkUrlInput(e.target.value)}
-                        />
-                        <button className="dash-primary-btn" type="button" onClick={addDashboardLink}>링크 추가</button>
-                      </div>
-                      <div className="dash-link-list">
-                        {dashboardLinks.map((link) => (
-                          <div className="dash-link-item" key={link.id}>
-                            <div className={`dash-link-icon kind-${link.kind}`}>{link.kind.slice(0, 1).toUpperCase()}</div>
-                            <div className="dash-link-copy">
-                              <div className="dash-link-label">{link.label}</div>
-                              <a className="dash-link-url" href={link.url} target="_blank" rel="noreferrer">{link.url}</a>
-                            </div>
-                            <button className="dash-ghost-btn" type="button" onClick={() => removeDashboardLink(link.id)}>삭제</button>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className="dash-card">
-                      <div className="dash-card-head">
-                        <div>
-                          <p className="dash-eyebrow">Team Roles</p>
-                          <h3 className="dash-title">팀원 역할</h3>
-                        </div>
-                        <button className="dash-primary-btn" type="button" onClick={addTeamRole}>팀원 추가</button>
-                      </div>
-                      <div className="team-role-list">
-                        <div className="team-role-head">
-                          <span>이름</span>
-                          <span>역할</span>
-                          <span>관리</span>
-                        </div>
-                        {teamRoles.map((member) => (
-                          <div className="team-role-card" key={member.id}>
-                            <input
-                              className="dash-input team-name compact"
-                              value={member.name}
-                              onChange={(e) => updateTeamRole(member.id, { name: e.target.value })}
-                            />
-                            <input
-                              className="dash-input compact"
-                              value={member.role}
-                              onChange={(e) => updateTeamRole(member.id, { role: e.target.value })}
-                            />
-                            <button className="dash-ghost-btn compact-btn" type="button" onClick={() => removeTeamRole(member.id)}>삭제</button>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  </div>
-                </div>
+                <DashboardView
+                  roomId={roomId}
+                  dashboardNotice={dashboardNotice}
+                  projectName={projectName}
+                  projectSummary={projectSummary}
+                  projectGoal={projectGoal}
+                  dashboardLinks={dashboardLinks}
+                  linkKindInput={linkKindInput}
+                  linkLabelInput={linkLabelInput}
+                  linkUrlInput={linkUrlInput}
+                  teamRoles={teamRoles}
+                  onProjectNameChange={(nextValue) => {
+                    setProjectName(nextValue)
+                    scheduleDashboardMetaSave(nextValue, projectSummary, projectGoal)
+                  }}
+                  onProjectSummaryChange={(nextValue) => {
+                    setProjectSummary(nextValue)
+                    scheduleDashboardMetaSave(projectName, nextValue, projectGoal)
+                  }}
+                  onProjectGoalChange={(nextValue) => {
+                    setProjectGoal(nextValue)
+                    scheduleDashboardMetaSave(projectName, projectSummary, nextValue)
+                  }}
+                  onLinkKindChange={setLinkKindInput}
+                  onLinkLabelChange={setLinkLabelInput}
+                  onLinkUrlChange={setLinkUrlInput}
+                  onAddDashboardLink={addDashboardLink}
+                  onRemoveDashboardLink={removeDashboardLink}
+                  onAddTeamRole={addTeamRole}
+                  onUpdateTeamRole={updateTeamRole}
+                  onRemoveTeamRole={removeTeamRole}
+                />
               )}
 
               {activePage === 'chat' && (
-                <div className="page active chat-page">
-                  <div className="chat-messages" ref={chatScrollRef}>
-                    {messages.length === 0 && <p className="empty-chat">아직 메시지가 없어요. 첫 메시지를 보내보세요!</p>}
-                    {messages.map((msg) => {
-                      const isMe = msg.session_id === sessionId
-                      const safeName = msg.display_name?.trim() || '익명'
-                      return (
-                        <div key={msg.id} className={`msg${isMe ? ' me' : ''}`}>
-                          <div className={`av ${getAvColor(safeName)}`}>{safeName[0]}</div>
-                          <div className="bubble-wrap">
-                            {!isMe && <span className="sender-name">{safeName}</span>}
-                            <div className="bubble">{msg.content}</div>
-                            <div className="msg-meta">{formatTime(msg.created_at)}</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    <div ref={bottomRef} />
-                  </div>
-                  <div className="chat-input-row sticky-input">
-                    <input
-                      className="chat-input"
-                      placeholder="메시지를 입력하세요..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onCompositionStart={() => { composingRef.current = true }}
-                      onCompositionEnd={() => { composingRef.current = false }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !composingRef.current) sendMessage()
-                      }}
-                      autoComplete="off"
-                    />
-                    <button className="send-btn" onClick={sendMessage}>
-                      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    </button>
-                  </div>
-                </div>
+                <ChatView
+                  messages={messages}
+                  sessionId={sessionId}
+                  input={input}
+                  chatScrollRef={chatScrollRef}
+                  bottomRef={bottomRef}
+                  composingRef={composingRef}
+                  onInputChange={setInput}
+                  onSendMessage={sendMessage}
+                />
               )}
 
               {activePage === 'kanban' && (
-                <div className="page active">
-                  <div className="kanban">
-                    {kanbanColumns.map((column) => {
-                      const tasks = kanbanTasks.filter((task) => task.status === column.key)
-                      const isOver = dragOverColumn === column.key && draggingTaskId !== null
-                      return (
-                        <div
-                          className={`k-col${isOver ? ' drag-over' : ''}`}
-                          key={column.key}
-                          onDragOver={(e) => { e.preventDefault(); setDragOverColumn(column.key) }}
-                          onDragLeave={(e) => {
-                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                              setDragOverColumn(null)
-                            }
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault()
-                            if (draggingTaskId !== null) {
-                              const draggingTask = kanbanTasks.find((t) => t.id === draggingTaskId)
-                              if (draggingTask && draggingTask.status !== column.key) {
-                                updateTask(draggingTaskId, { status: column.key }, { immediate: true })
-                              }
-                            }
-                            setDraggingTaskId(null)
-                            setDragOverColumn(null)
-                          }}
-                        >
-                          <div className="k-col-title">{column.label} <span className="k-count">{tasks.length}</span></div>
-                          {tasks.map((task) => (
-                            <button
-                              className={`k-card${selectedTaskId === task.id ? ' selected' : ''}${task.status === 'done' ? ' faded' : ''}${draggingTaskId === task.id ? ' dragging' : ''}`}
-                              key={task.id}
-                              draggable
-                              onClick={() => { if (draggingTaskId === null) setSelectedTaskId(task.id) }}
-                              onDragStart={(e) => {
-                                setDraggingTaskId(task.id)
-                                e.dataTransfer.effectAllowed = 'move'
-                              }}
-                              onDragEnd={() => {
-                                setDraggingTaskId(null)
-                                setDragOverColumn(null)
-                              }}
-                              type="button"
-                            >
-                              <div className="k-card-title">{task.title}</div>
-                              <div className="k-card-meta">
-                                <span className={`k-tag ${task.categoryClass}`}>{task.category}</span>
-                                <span className="k-owner">{task.owner}</span>
-                              </div>
-                              <div className={`k-due ${task.overdue ? 'overdue' : ''}`}>{formatDueLabel(task.due, task.overdue)}</div>
-                            </button>
-                          ))}
-                          <button className="k-add" type="button" onClick={() => addKanbanTask(column.key)}>+ 카드 추가</button>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {selectedTask && (
-                    <div className="task-modal-backdrop" onClick={() => setSelectedTaskId(null)}>
-                      <div className="task-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="task-panel-top">
-                          <div>
-                            <p className="task-panel-eyebrow">태스크 상세</p>
-                            <h3 className="task-panel-title">{selectedTask.title}</h3>
-                            {taskNotice ? <p className="task-panel-notice">{taskNotice}</p> : null}
-                          </div>
-                          <div className="task-modal-actions">
-                            <span className={`task-status-chip status-${selectedTask.status}`}>{kanbanColumns.find((column) => column.key === selectedTask.status)?.label}</span>
-                            <button className="task-delete" type="button" onClick={() => deleteTask(selectedTask.id)}>삭제</button>
-                            <button className="task-close" type="button" onClick={() => setSelectedTaskId(null)}>닫기</button>
-                          </div>
-                        </div>
-
-                        <div className="task-form">
-                          <label className="task-field">
-                            <span>제목</span>
-                            <input
-                              className="task-input"
-                              value={selectedTask.title}
-                              onChange={(e) => updateTask(selectedTask.id, { title: e.target.value })}
-                            />
-                          </label>
-
-                          <div className="task-field-grid">
-                            <label className="task-field">
-                              <span>상태</span>
-                              <select
-                                className="task-input"
-                                value={selectedTask.status}
-                                onChange={(e) => updateTask(selectedTask.id, { status: e.target.value as KanbanColumnKey }, { immediate: true })}
-                              >
-                                {kanbanColumns.map((column) => (
-                                  <option key={column.key} value={column.key}>{column.label}</option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <label className="task-field">
-                              <span>마감 날짜</span>
-                              <input
-                                className="task-input"
-                                type="date"
-                                value={selectedTask.status === 'done' ? '' : toDateInputValue(selectedTask.due)}
-                                onChange={(e) => updateTask(selectedTask.id, { due: e.target.value || '미정' }, { immediate: true })}
-                                disabled={selectedTask.status === 'done'}
-                              />
-                            </label>
-                          </div>
-
-                          <div className="task-field-grid">
-                            <label className="task-field">
-                              <span>분류</span>
-                              <input
-                                className="task-input"
-                                value={selectedTask.category}
-                                onChange={(e) => updateTask(selectedTask.id, { category: e.target.value })}
-                              />
-                            </label>
-
-                            <label className="task-field">
-                              <span>담당</span>
-                              <input
-                                className="task-input"
-                                value={selectedTask.owner}
-                                onChange={(e) => updateTask(selectedTask.id, { owner: e.target.value })}
-                              />
-                            </label>
-                          </div>
-
-                          <label className="task-field">
-                            <span>설명</span>
-                            <textarea
-                              className="task-textarea"
-                              value={selectedTask.description}
-                              onChange={(e) => updateTask(selectedTask.id, { description: e.target.value })}
-                            />
-                          </label>
-
-                          <label className="task-toggle">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(selectedTask.overdue)}
-                              disabled={selectedTask.status === 'done'}
-                              onChange={(e) => updateTask(selectedTask.id, { overdue: e.target.checked }, { immediate: true })}
-                            />
-                            <span>마감 초과 표시</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <KanbanView
+                  columns={kanbanColumns}
+                  tasks={kanbanTasks}
+                  selectedTask={selectedTask}
+                  selectedTaskId={selectedTaskId}
+                  draggingTaskId={draggingTaskId}
+                  dragOverColumn={dragOverColumn}
+                  taskNotice={taskNotice}
+                  onDragOverColumn={setDragOverColumn}
+                  onClearDragOverColumn={() => setDragOverColumn(null)}
+                  onDraggingTaskChange={setDraggingTaskId}
+                  onSelectTask={setSelectedTaskId}
+                  onUpdateTask={updateTask}
+                  onAddTask={addKanbanTask}
+                  onDeleteTask={deleteTask}
+                />
               )}
 
               {activePage === 'schedule' && (
                 <div className="page active">
-                  <ScheduleView roomId={roomId} sessionId={sessionId} />
+                  <ScheduleView roomId={roomId} sessionId={authUserId ?? sessionId} />
                 </div>
               )}
 

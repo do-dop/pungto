@@ -139,7 +139,9 @@ export function useSchedules(roomId: string): UseSchedulesResult {
           table: "schedules",
         },
         (payload) => {
-          const deletedId = (payload.old as { id: string }).id;
+          const deleted = payload.old as { id?: string; room_id?: string };
+          const deletedId = deleted.id;
+          if (!deletedId || deleted.room_id !== roomId) return;
           setSchedules((prev) => prev.filter((s) => s.id !== deletedId));
         }
       )

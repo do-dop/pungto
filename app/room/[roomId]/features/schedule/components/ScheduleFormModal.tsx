@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { Schedule, ScheduleColor, ScheduleInput } from "../types";
 
 type ScheduleFormModalProps = {
@@ -32,6 +32,18 @@ export function ScheduleFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = Boolean(initialSchedule);
+  const titleId = useId();
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const handleDelete = async () => {
     if (!initialSchedule || !onDelete) return;
@@ -77,10 +89,22 @@ export function ScheduleFormModal({
   };
 
   return (
-    <div className="schedule-modal-backdrop">
-      <div className="schedule-modal">
+    <div
+      className="schedule-modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="schedule-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className="schedule-modal-header">
-          <h3>{isEditing ? "일정 수정" : "일정 추가"}</h3>
+          <h3 id={titleId}>{isEditing ? "일정 수정" : "일정 추가"}</h3>
           <button type="button" onClick={onClose} aria-label="닫기">
             ×
           </button>

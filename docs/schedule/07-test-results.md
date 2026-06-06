@@ -49,7 +49,7 @@
 
 * 현상: 일정 탭 진입 시 “일정 목록을 불러오지 못했습니다.” 메시지가 표시됨
 * 원인: Supabase에 `schedules` 테이블이 없거나 RLS policy 또는 Realtime 설정이 누락됨
-* 수정: `docs/sql/create-schedules-table.sql`에 테이블 생성, color 컬럼, RLS policy, Realtime publication 설정 SQL 추가
+* 수정: `docs/sql/create-room-access.sql`에 방 참여자 접근 제어를, `docs/sql/create-schedules-table.sql`에 일정 테이블, color 컬럼, RLS policy, Realtime publication 설정 SQL을 분리하여 추가
 * 결과: SQL 실행 후 일정 조회 및 생성 가능
 
 ### BUG-02. 삭제 후 새로고침해야 화면에서 사라지는 문제

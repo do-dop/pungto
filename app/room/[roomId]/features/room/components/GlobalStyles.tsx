@@ -81,6 +81,19 @@ export function GlobalStyles() {
         box-shadow: 0 14px 28px rgba(83, 74, 183, 0.22);
       }
       .join-title { font-size: 28px; line-height: 1.1; font-weight: 700; color: #1f1d2f; margin-bottom: 8px; }
+      .join-room-title {
+        max-width: 100%;
+        margin: 0 auto 8px;
+        padding: 8px 12px;
+        border: 1px solid #e9e3d8;
+        border-radius: 12px;
+        background: #fbf8f3;
+        color: #3f3a4a;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
       .join-desc { font-size: 14px; line-height: 1.6; color: #7d7888; margin-bottom: 20px; }
       .join-input {
         width: 100%; border: 1px solid #e7dfd3; border-radius: 16px; padding: 14px 16px; font-size: 15px;
@@ -94,6 +107,7 @@ export function GlobalStyles() {
         transition: transform 0.18s ease, box-shadow 0.18s ease;
       }
       .join-btn:hover { transform: translateY(-1px); box-shadow: 0 18px 34px rgba(83, 74, 183, 0.28); }
+      .join-error { margin: -2px 0 10px; color: #b91c1c; font-size: 12px; line-height: 1.5; }
       .join-hint { margin-top: 12px; font-size: 12px; color: #9a94a4; }
       .wrap {
         display: flex; width: 100%; max-width: 960px; height: 720px; border: 1px solid #e0ddd5; border-radius: 16px;
@@ -123,7 +137,23 @@ export function GlobalStyles() {
       .topbar {
         display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #e0ddd5; flex-shrink: 0; background: #fff;
       }
-      .page-title { font-size: 14px; font-weight: 600; color: #1a1a1a; flex: 1; }
+      .topbar-title {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .room-title {
+        color: #1f1d2f;
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .page-title { font-size: 11px; font-weight: 600; color: #9a94a4; }
       .url-pill {
         display: flex; align-items: center; gap: 5px; background: #f5f5f3; border: 1px solid #e0ddd5; border-radius: 20px;
         padding: 4px 10px; font-size: 11px; color: #888; cursor: pointer; transition: border-color 0.15s;
