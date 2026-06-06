@@ -96,7 +96,7 @@ export function ScheduleView({ roomId, sessionId }: ScheduleViewProps) {
   const startDate = new Date(firstDayOfMonth);
   startDate.setDate(firstDayOfMonth.getDate() - firstDayOfMonth.getDay());
 
-  const calendarDates = Array.from({ length: 35 }, (_, index) => {
+  const calendarDates = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + index);
     return date;

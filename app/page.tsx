@@ -2,20 +2,64 @@
 import { nanoid } from 'nanoid'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createRoomWithPassword } from '@/lib/auth'
+
+function getCreateRoomNotice(error: unknown) {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message)
+      : ''
+
+  if (message.includes('Anonymous sign-ins are disabled') || message.includes('Anonymous signups are disabled')) {
+    return 'Supabase Authentication에서 Anonymous Sign-Ins를 켜주세요.'
+  }
+
+  if (message.includes('create_room_with_password') || message.includes('Could not find the function')) {
+    return 'Supabase SQL Editor에서 최신 create-room-access.sql을 먼저 실행해주세요.'
+  }
+
+  if (message.includes('Authentication required') || message.includes('JWT')) {
+    return '익명 인증 세션을 만들지 못했습니다. Anonymous Sign-Ins 설정을 확인해주세요.'
+  }
+
+  if (message.includes('duplicate key') || message.includes('already exists')) {
+    return '방 ID가 충돌했습니다. 다시 한 번 방 만들기를 눌러주세요.'
+  }
+
+  return message ? `방을 만들지 못했습니다: ${message}` : '방을 만들지 못했습니다. 잠시 후 다시 시도해주세요.'
+}
 
 export default function Home() {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
+  const [roomTitle, setRoomTitle] = useState('')
+  const [roomPassword, setRoomPassword] = useState('')
+  const [notice, setNotice] = useState('')
 
   async function createRoom() {
     if (creating) return
+    const title = roomTitle.trim()
+    const password = roomPassword.trim()
+    if (!title) {
+      setNotice('방 이름을 입력해주세요.')
+      return
+    }
+
+    if (password.length < 4) {
+      setNotice('방 비밀번호는 4자 이상 입력해주세요.')
+      return
+    }
+
     setCreating(true)
+    setNotice('')
     const roomId = nanoid(6)
 
-    const { error } = await supabase.from('rooms').insert({ id: roomId, title: '새 방' })
-    if (error) {
-      console.error('Create room error:', error)
+    try {
+      await createRoomWithPassword(roomId, title, password)
+    } catch (error) {
+      console.error('Create protected room error:', error)
+      setNotice(getCreateRoomNotice(error))
       setCreating(false)
       return
     }
@@ -34,8 +78,36 @@ export default function Home() {
           <div className="landing-points">
             <span>실시간 채팅</span>
             <span>빠른 초대 링크</span>
-            <span>가입 없이 시작</span>
+            <span>비밀번호 입장</span>
           </div>
+          <input
+            className="landing-input"
+            value={roomTitle}
+            onChange={(event) => {
+              setRoomTitle(event.target.value)
+              setNotice('')
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void createRoom()
+            }}
+            placeholder="방 이름"
+            autoComplete="off"
+          />
+          <input
+            className="landing-input"
+            type="password"
+            value={roomPassword}
+            onChange={(event) => {
+              setRoomPassword(event.target.value)
+              setNotice('')
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void createRoom()
+            }}
+            placeholder="방 비밀번호"
+            autoComplete="new-password"
+          />
+          {notice && <p className="landing-notice">{notice}</p>}
           <button
             onClick={createRoom}
             className="landing-btn"
@@ -120,6 +192,30 @@ export default function Home() {
           border: 1px solid #ebe5db;
           color: #686272;
           font-size: 12px;
+        }
+        .landing-input {
+          width: 100%;
+          border: 1px solid #e7dfd3;
+          border-radius: 14px;
+          padding: 12px 14px;
+          margin-bottom: 10px;
+          background: #fbf8f3;
+          color: #1f1d2f;
+          font: inherit;
+          font-size: 14px;
+          outline: none;
+          text-align: center;
+        }
+        .landing-input:focus {
+          border-color: #7f77dd;
+          background: #fff;
+          box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.14);
+        }
+        .landing-notice {
+          margin: -2px 0 10px;
+          color: #b91c1c;
+          font-size: 12px;
+          line-height: 1.5;
         }
         .landing-btn {
           width: 100%;

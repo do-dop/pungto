@@ -71,6 +71,8 @@ Supabase에 `schedules` 테이블을 추가한다고 가정한다.
 
 ## 6. Supabase 테이블 설계 SQL
 
+SQL 산출물은 책임에 따라 두 파일로 분리하였다. 방 생성, 방 비밀번호, 참여자 등록, 접근 제어 함수는 `docs/sql/create-room-access.sql`에 두고, 일정 테이블과 일정 CRUD RLS, Realtime 설정은 `docs/sql/create-schedules-table.sql`에 둔다. 일정 RLS가 `room_members`를 참조하므로 실행 순서는 `create-room-access.sql` 이후 `create-schedules-table.sql`이다.
+
 ```sql
 create table if not exists schedules (
   id uuid primary key default gen_random_uuid(),
@@ -86,35 +88,44 @@ create table if not exists schedules (
     check (color in ('purple', 'teal', 'coral'))
 );
 
+create table if not exists room_members (
+  room_id text not null references rooms(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  display_name text,
+  joined_at timestamp with time zone default now(),
+  primary key (room_id, user_id)
+);
+
+create table if not exists room_secrets (
+  room_id text primary key references rooms(id) on delete cascade,
+  password_hash text not null,
+  created_at timestamp with time zone default now()
+);
+
 create index if not exists idx_schedules_room_id
 on schedules(room_id);
 
 alter table schedules replica identity full;
 
 alter table schedules enable row level security;
+alter table room_members enable row level security;
+alter table room_secrets enable row level security;
 
--- 익명 방 기반 협업 앱이므로 현재 구현에서는 public CRUD 정책을 사용한다.
--- 실제 서비스에서는 방 참여자 검증 정책으로 강화해야 한다.
-create policy "Allow public schedule read"
+-- 방 비밀번호는 room_secrets에 crypt() 해시로 저장한다.
+-- 클라이언트는 room_members에 직접 insert하지 않고,
+-- join_room_with_password() RPC가 비밀번호 검증 후 멤버를 등록한다.
+
+create policy "Allow room members to read schedules"
 on schedules
 for select
-using (true);
-
-create policy "Allow public schedule insert"
-on schedules
-for insert
-with check (true);
-
-create policy "Allow public schedule update"
-on schedules
-for update
-using (true)
-with check (true);
-
-create policy "Allow public schedule delete"
-on schedules
-for delete
-using (true);
+using (
+  exists (
+    select 1
+    from room_members
+    where room_members.room_id = schedules.room_id
+      and room_members.user_id = auth.uid()
+  )
+);
 
 alter publication supabase_realtime add table schedules;
 ```
