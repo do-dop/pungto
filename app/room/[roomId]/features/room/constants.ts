@@ -3,7 +3,6 @@ import type {
   NotificationItem,
   PageKey,
   ShellBackgroundKey,
-  TodoItem,
 } from './types'
 
 export const pageTitles: Record<PageKey, string> = {
@@ -31,15 +30,6 @@ export const notifications: NotificationItem[] = [
   { tone: 'ni-a', title: '오늘 오후 3시 <b>팀 위클리</b> 일정이 있어요', time: '2시간 전', unread: true },
   { tone: 'ni-t', title: '<b>김정현</b>이 디자인 시스템 v1 파일을 업로드했어요', time: '어제 오후 4:12' },
   { tone: 'ni-p', title: '<b>프로토타입 1차 개발</b> 카드가 진행 중으로 이동됐어요', time: '어제 오전 11:30' },
-]
-
-export const initialTodos: TodoItem[] = [
-  { id: 1, text: '랜딩 페이지 카피 초안 완성', due: '오늘 마감', urgent: true },
-  { id: 2, text: '팀 위클리 준비 — 주간 요약 작성', due: '오늘 오후 2시', urgent: true },
-  { id: 3, text: '기획서 v2 공유', due: '완료', done: true },
-  { id: 4, text: '경쟁사 UI 벤치마킹 리포트', due: '4/18' },
-  { id: 5, text: '사용자 인터뷰 설계서 작성', due: '4/20' },
-  { id: 6, text: '디자인 시스템 검토 참석', due: '4/16' },
 ]
 
 export const SHELL_BACKGROUND_STORAGE_KEY = 'pungto-room-shell-background'

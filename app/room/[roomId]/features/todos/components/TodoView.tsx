@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react'
-import type { TodoItem } from '../../room/types'
+import type { TodoItem } from '../types'
 
 type TodoViewProps = {
   todos: TodoItem[]

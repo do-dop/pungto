@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import {
+  deleteScheduleRow,
+  insertScheduleRow,
+  loadScheduleRows,
+  subscribeToSchedules,
+  updateScheduleRow,
+} from "../services/scheduleService";
 import type { Schedule, ScheduleInput } from "../types";
 
 type UseSchedulesResult = {
@@ -13,6 +19,8 @@ type UseSchedulesResult = {
   updateSchedule: (id: string, input: ScheduleInput) => Promise<boolean>;
   deleteSchedule: (id: string) => Promise<boolean>;
 };
+
+type ScheduleSubscription = ReturnType<typeof subscribeToSchedules>;
 
 function formatSupabaseError(error: unknown) {
   if (!error || typeof error !== "object") return error;
@@ -40,11 +48,17 @@ function sortSchedules(schedules: Schedule[]) {
   );
 }
 
+function validateScheduleInput(input: ScheduleInput) {
+  if (!input.title.trim()) return "일정 제목을 입력해주세요.";
+  if (!input.scheduled_date) return "일정 날짜를 입력해주세요.";
+  return null;
+}
+
 export function useSchedules(roomId: string): UseSchedulesResult {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const scheduleChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const scheduleSubscriptionRef = useRef<ScheduleSubscription | null>(null);
 
   const fetchSchedules = useCallback(async () => {
     if (!roomId) return;
@@ -52,197 +66,99 @@ export function useSchedules(roomId: string): UseSchedulesResult {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const { data, error } = await supabase
-      .from("schedules")
-      .select("*")
-      .eq("room_id", roomId)
-      .order("scheduled_date", { ascending: true })
-      .order("created_at", { ascending: true });
-
-    if (error) {
+    try {
+      setSchedules(await loadScheduleRows(roomId));
+    } catch (error) {
       console.error("Load schedules error:", formatSupabaseError(error));
       setErrorMessage("일정 목록을 불러오지 못했습니다.");
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    setSchedules((data ?? []) as Schedule[]);
-    setIsLoading(false);
   }, [roomId]);
 
-  // 초기 데이터 로드 + Supabase Realtime 구독 (FR-06)
   useEffect(() => {
     if (!roomId) return;
 
-    // 초기 데이터 로드 (fetchSchedules와 동일하나 effect 내 인라인으로 처리)
-    supabase
-      .from("schedules")
-      .select("*")
-      .eq("room_id", roomId)
-      .order("scheduled_date", { ascending: true })
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("Load schedules error:", formatSupabaseError(error));
-          setErrorMessage("일정 목록을 불러오지 못했습니다.");
-        } else {
-          setSchedules((data ?? []) as Schedule[]);
-        }
-        setIsLoading(false);
-      });
+    void fetchSchedules();
 
-    // INSERT/UPDATE는 DB 이벤트를 쓰고, DELETE는 broadcast로도 보강한다.
-    const channel = supabase
-      .channel(`schedules:${roomId}`)
-      .on("broadcast", { event: "schedule_deleted" }, ({ payload }) => {
-        const deletedId = (payload as { id?: string; roomId?: string }).id;
-        const deletedRoomId = (payload as { id?: string; roomId?: string }).roomId;
-        if (!deletedId || deletedRoomId !== roomId) return;
-        setSchedules((prev) => prev.filter((s) => s.id !== deletedId));
-      })
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "schedules",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const newSchedule = payload.new as Schedule;
-          setSchedules((prev) => {
-            if (prev.some((s) => s.id === newSchedule.id)) return prev;
-            return sortSchedules([...prev, newSchedule]);
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "schedules",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const updated = payload.new as Schedule;
-          setSchedules((prev) =>
-            sortSchedules(prev.map((s) => (s.id === updated.id ? updated : s)))
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "schedules",
-        },
-        (payload) => {
-          const deleted = payload.old as { id?: string; room_id?: string };
-          const deletedId = deleted.id;
-          if (!deletedId || deleted.room_id !== roomId) return;
-          setSchedules((prev) => prev.filter((s) => s.id !== deletedId));
-        }
-      )
-      .subscribe();
+    const subscription = subscribeToSchedules(roomId, (payload) => {
+      if (payload.eventType === "INSERT" && payload.schedule) {
+        const nextSchedule = payload.schedule;
+        setSchedules((prev) => {
+          if (prev.some((schedule) => schedule.id === nextSchedule.id)) return prev;
+          return sortSchedules([...prev, nextSchedule]);
+        });
+        return;
+      }
 
-    scheduleChannelRef.current = channel;
+      if (payload.eventType === "UPDATE" && payload.schedule) {
+        const nextSchedule = payload.schedule;
+        setSchedules((prev) =>
+          sortSchedules(prev.map((schedule) => (schedule.id === nextSchedule.id ? nextSchedule : schedule)))
+        );
+        return;
+      }
+
+      if ((payload.eventType === "DELETE" || payload.eventType === "BROADCAST_DELETE") && payload.deletedId && payload.deletedRoomId === roomId) {
+        setSchedules((prev) => prev.filter((schedule) => schedule.id !== payload.deletedId));
+      }
+    });
+
+    scheduleSubscriptionRef.current = subscription;
 
     return () => {
-      scheduleChannelRef.current = null;
-      void supabase.removeChannel(channel);
+      scheduleSubscriptionRef.current = null;
+      subscription.unsubscribe();
     };
-  }, [roomId]);
+  }, [fetchSchedules, roomId]);
 
   const createSchedule = useCallback(
     async (input: ScheduleInput, sessionId?: string | null) => {
-      if (!input.title.trim()) {
-        setErrorMessage("일정 제목을 입력해주세요.");
-        return false;
-      }
-
-      if (!input.scheduled_date) {
-        setErrorMessage("일정 날짜를 입력해주세요.");
+      const validationError = validateScheduleInput(input);
+      if (validationError) {
+        setErrorMessage(validationError);
         return false;
       }
 
       setErrorMessage(null);
 
-      const { data, error } = await supabase
-        .from("schedules")
-        .insert({
-          room_id: roomId,
-          title: input.title.trim(),
-          description: input.description?.trim() || null,
-          scheduled_date: input.scheduled_date,
-          color: input.color,
-          created_by: sessionId ?? null,
-        })
-        .select("*")
-        .single();
-
-      if (error) {
-        console.error("Create schedule error:", formatSupabaseError(error));
-        setErrorMessage("일정을 생성하지 못했습니다.");
-        return false;
-      }
-
-      if (data) {
-        const created = data as Schedule;
+      try {
+        const created = await insertScheduleRow(roomId, input, sessionId);
         setSchedules((prev) => {
           if (prev.some((schedule) => schedule.id === created.id)) return prev;
           return sortSchedules([...prev, created]);
         });
+        return true;
+      } catch (error) {
+        console.error("Create schedule error:", formatSupabaseError(error));
+        setErrorMessage("일정을 생성하지 못했습니다.");
+        return false;
       }
-
-      return true;
     },
     [roomId]
   );
 
   const updateSchedule = useCallback(
     async (id: string, input: ScheduleInput) => {
-      if (!input.title.trim()) {
-        setErrorMessage("일정 제목을 입력해주세요.");
-        return false;
-      }
-
-      if (!input.scheduled_date) {
-        setErrorMessage("일정 날짜를 입력해주세요.");
+      const validationError = validateScheduleInput(input);
+      if (validationError) {
+        setErrorMessage(validationError);
         return false;
       }
 
       setErrorMessage(null);
 
-      const { data, error } = await supabase
-        .from("schedules")
-        .update({
-          title: input.title.trim(),
-          description: input.description?.trim() || null,
-          scheduled_date: input.scheduled_date,
-          color: input.color,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .eq("room_id", roomId)
-        .select("*")
-        .single();
-
-      if (error) {
+      try {
+        const updated = await updateScheduleRow(roomId, id, input);
+        setSchedules((prev) =>
+          sortSchedules(prev.map((schedule) => (schedule.id === updated.id ? updated : schedule)))
+        );
+        return true;
+      } catch (error) {
         console.error("Update schedule error:", formatSupabaseError(error));
         setErrorMessage("일정을 수정하지 못했습니다.");
         return false;
       }
-
-      if (data) {
-        const updated = data as Schedule;
-        setSchedules((prev) =>
-          sortSchedules(prev.map((schedule) => (schedule.id === updated.id ? updated : schedule)))
-        );
-      }
-
-      return true;
     },
     [roomId]
   );
@@ -251,26 +167,16 @@ export function useSchedules(roomId: string): UseSchedulesResult {
     async (id: string) => {
       setErrorMessage(null);
 
-      const { error } = await supabase
-        .from("schedules")
-        .delete()
-        .eq("id", id)
-        .eq("room_id", roomId);
-
-      if (error) {
+      try {
+        await deleteScheduleRow(roomId, id);
+        setSchedules((prev) => prev.filter((schedule) => schedule.id !== id));
+        void scheduleSubscriptionRef.current?.sendDeleteBroadcast(id);
+        return true;
+      } catch (error) {
         console.error("Delete schedule error:", formatSupabaseError(error));
         setErrorMessage("일정을 삭제하지 못했습니다.");
         return false;
       }
-
-      setSchedules((prev) => prev.filter((schedule) => schedule.id !== id));
-      void scheduleChannelRef.current?.send({
-        type: "broadcast",
-        event: "schedule_deleted",
-        payload: { id, roomId },
-      });
-
-      return true;
     },
     [roomId]
   );
